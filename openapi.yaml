@@ -1,0 +1,281 @@
+openapi: 3.1.0
+info:
+  title: Snake Duel API (inferred)
+  version: 0.1.0
+  description: |
+    OpenAPI specification generated from the frontend client (mock `src/lib/api.ts`).
+    This spec models the minimal endpoints the frontend expects: authentication,
+    leaderboard, and active players (watch mode). Use this as the contract for
+    implementing the backend.
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production API (replace with real host)
+
+paths:
+  /auth/login:
+    post:
+      summary: Log in a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login result (success + user data)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        '400':
+          description: Invalid request
+
+  /auth/signup:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        '400':
+          description: Validation or already exists
+
+  /auth/logout:
+    post:
+      summary: Log out current user
+      responses:
+        '204':
+          description: Successfully logged out (no content)
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+
+  /leaderboard:
+    get:
+      summary: Get leaderboard entries
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+          description: Maximum number of entries to return
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [passthrough, walls]
+          description: Filter by game mode
+      responses:
+        '200':
+          description: Sorted leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+  /leaderboard/score:
+    post:
+      summary: Submit a score to the leaderboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [score, mode]
+              properties:
+                score:
+                  type: integer
+                  minimum: 0
+                mode:
+                  type: string
+                  enum: [passthrough, walls]
+      responses:
+        '200':
+          description: Submission result with computed rank
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  rank:
+                    type: integer
+                    nullable: true
+        '401':
+          description: Not authenticated
+
+  /players/active:
+    get:
+      summary: Get currently active players for watch mode
+      responses:
+        '200':
+          description: Array of active players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivePlayer'
+
+  /players/{playerId}:
+    get:
+      summary: Get a single player's current state
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Player state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivePlayer'
+        '404':
+          description: Player not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Position:
+      type: object
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+      required: [x, y]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+        highScore:
+          type: integer
+      required: [id, username, email, createdAt, highScore]
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        username:
+          type: string
+        score:
+          type: integer
+        mode:
+          type: string
+          enum: [passthrough, walls]
+        date:
+          type: string
+          format: date-time
+      required: [id, userId, username, score, mode, date]
+
+    ActivePlayer:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        currentScore:
+          type: integer
+        mode:
+          type: string
+          enum: [passthrough, walls]
+        snake:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+        food:
+          $ref: '#/components/schemas/Position'
+        direction:
+          type: string
+          enum: [UP, DOWN, LEFT, RIGHT]
+        isPlaying:
+          type: boolean
+      required: [id, username, currentScore, mode, snake, food, direction, isPlaying]
+
+    AuthResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+        error:
+          type: string
+          nullable: true
+
+tags:
+  - name: auth
+    description: Authentication endpoints
+  - name: leaderboard
+    description: Leaderboard endpoints
+  - name: players
+    description: Watch mode / active players
