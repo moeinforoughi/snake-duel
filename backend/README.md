@@ -16,10 +16,12 @@ Run this from the repository root or change into `backend/` first:
 
 ```bash
 cd backend
-uv sync
+uv sync --all-extras
 ```
 
-This will create a local virtual environment at `backend/.venv` and install pinned dependencies from `pyproject.toml`.
+This will create a local virtual environment at `backend/.venv` and install all dependencies (including dev extras like pytest) from `pyproject.toml`.
+
+(Alternatively, use `uv sync` to install only production dependencies.)
 
 Run the server (development)
 Simple (recommended for development):
