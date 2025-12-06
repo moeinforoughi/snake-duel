@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime
 from main import create_app
-from database import MockDatabase, Position, ActivePlayer
+from app.database import MockDatabase, Position, ActivePlayer
 import uuid
 
 
@@ -268,7 +268,7 @@ class TestLeaderboard:
 
     def test_submit_score_with_mock_auth(self, client, app):
         """Test submitting score with mock authentication"""
-        from database import db
+        from app.database import db
 
         # Create a test user and session
         user = db.create_user("scoreuser", "scoreuser@example.com", "password123")
@@ -421,7 +421,7 @@ class TestEdgeCases:
 
     def test_submit_score_negative(self, client, app):
         """Test submitting negative score"""
-        from database import db
+        from app.database import db
 
         user = db.create_user("neguser", "neg@example.com", "password")
         token = db.create_session(user.id)
@@ -440,7 +440,7 @@ class TestEdgeCases:
 
     def test_submit_score_invalid_mode(self, client, app):
         """Test submitting score with invalid mode"""
-        from database import db
+        from app.database import db
 
         user = db.create_user("modeuser", "mode@example.com", "password")
         token = db.create_session(user.id)

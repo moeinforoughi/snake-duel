@@ -1,14 +1,13 @@
-"""Players and watch mode routes"""
+"""Players and watch mode routes (package version)"""
 from fastapi import APIRouter, HTTPException, status
-from database import db
-from schemas import ActivePlayerSchema, PositionSchema
+from .database import db
+from .schemas import ActivePlayerSchema, PositionSchema
 
 router = APIRouter(prefix="/players", tags=["players"])
 
 
 @router.get("/active", response_model=list[ActivePlayerSchema])
 def get_active_players() -> list[ActivePlayerSchema]:
-    """Get currently active players for watch mode"""
     players = db.get_all_active_players()
 
     return [
@@ -28,14 +27,10 @@ def get_active_players() -> list[ActivePlayerSchema]:
 
 @router.get("/{playerId}", response_model=ActivePlayerSchema)
 def get_player(playerId: str) -> ActivePlayerSchema:
-    """Get a single player's current state"""
     player = db.get_active_player(playerId)
 
     if not player:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Player not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player not found")
 
     return ActivePlayerSchema(
         id=player.id,

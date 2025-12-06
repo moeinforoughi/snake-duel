@@ -1,9 +1,9 @@
 """Snake Duel API - FastAPI Backend"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes_auth import router as auth_router
-from routes_leaderboard import router as leaderboard_router
-from routes_players import router as players_router
+from app.routes_auth import router as auth_router
+from app.routes_leaderboard import router as leaderboard_router
+from app.routes_players import router as players_router
 
 
 def create_app() -> FastAPI:

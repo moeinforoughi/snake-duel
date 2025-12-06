@@ -1,9 +1,9 @@
-"""Leaderboard routes"""
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+"""Leaderboard routes (package version)"""
+from fastapi import APIRouter, Depends, Query
 from typing import Optional
-from database import db, User
-from schemas import LeaderboardEntrySchema, ScoreSubmissionRequest, ScoreSubmissionResult
-from routes_auth import get_current_user
+from .database import db, User
+from .schemas import LeaderboardEntrySchema, ScoreSubmissionRequest, ScoreSubmissionResult
+from .routes_auth import get_current_user
 
 router = APIRouter(tags=["leaderboard"])
 
@@ -13,7 +13,6 @@ def get_leaderboard(
     limit: int = Query(10, ge=1),
     mode: Optional[str] = Query(None),
 ) -> list[LeaderboardEntrySchema]:
-    """Get leaderboard entries"""
     entries = db.get_leaderboard(limit=limit, mode=mode)
 
     return [
@@ -34,8 +33,6 @@ def submit_score(
     request: ScoreSubmissionRequest,
     user: User = Depends(get_current_user),
 ) -> ScoreSubmissionResult:
-    """Submit a score to the leaderboard"""
-    # Add entry to leaderboard
     entry = db.add_leaderboard_entry(
         user_id=user.id,
         username=user.username,
@@ -43,10 +40,6 @@ def submit_score(
         mode=request.mode,
     )
 
-    # Get rank
     rank = db.get_leaderboard_rank(request.score, mode=request.mode)
 
-    return ScoreSubmissionResult(
-        success=True,
-        rank=rank,
-    )
+    return ScoreSubmissionResult(success=True, rank=rank)

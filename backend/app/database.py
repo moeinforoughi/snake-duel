@@ -1,4 +1,4 @@
-"""Mock database for Snake Duel API"""
+"""Mock database for Snake Duel API (package version)"""
 from datetime import datetime, timedelta
 from typing import Optional
 import uuid
@@ -261,6 +261,8 @@ class MockDatabase:
         sorted_entries = sorted(
             entries, key=lambda e: (-e.score, -e.date.timestamp())
         )
+        if limit is None:
+            return sorted_entries
         return sorted_entries[:limit]
 
     def get_leaderboard_rank(self, score: int, mode: Optional[str] = None) -> Optional[int]:
