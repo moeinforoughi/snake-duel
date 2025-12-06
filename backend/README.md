@@ -47,6 +47,16 @@ cd backend
 uv run pytest -q
 ```
 
+Seed the database with fake data (optional)
+The mock database comes with a few sample users and leaderboard entries. To add more fake data for testing:
+
+```bash
+cd backend
+uv run python seed_db.py
+```
+
+This adds more users, leaderboard entries, and active players so you have richer data to explore.
+
 API examples
 - Health: `GET /health`
 
