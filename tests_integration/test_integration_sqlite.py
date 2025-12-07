@@ -6,6 +6,7 @@ request path via `TestClient` (signup, submit score, leaderboard).
 """
 import os
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
@@ -16,12 +17,15 @@ def create_app_with_sqlite(tmp_path: Path):
     # Prepare a temporary sqlite file and set env var before importing app modules
     db_file = tmp_path / "integration.db"
     os.environ["DATABASE_URL"] = f"sqlite:///{db_file}"
+    # Make sure the backend package is importable (tests run from backend/)
+    repo_root = Path(__file__).resolve().parents[1]
+    backend_path = repo_root / "backend"
+    if str(backend_path) not in sys.path:
+        sys.path.insert(0, str(backend_path))
 
     # Reload database module so it picks up the env var and creates an engine
     import app.database as dbmod
-
     importlib.reload(dbmod)
-
     # Import/create the app after the database module has been reloaded
     import main as main_mod
 
