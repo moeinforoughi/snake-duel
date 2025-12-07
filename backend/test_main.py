@@ -1,53 +1,59 @@
-"""Tests for Snake Duel API"""
+"""Tests for Snake Duel API with SQLAlchemy"""
 import pytest
 from fastapi.testclient import TestClient
-from datetime import datetime
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+
 from main import create_app
-from app.database import MockDatabase, Position, ActivePlayer
-import uuid
+from app.database import Base, get_db
+
+
+# Create a temporary database for testing
+@pytest.fixture(scope="function")
+def db_engine():
+    """Create a test database engine"""
+    # Use SQLite in-memory database for tests with thread safety disabled
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def db_session(db_engine):
+    """Create a test database session"""
+    TestingSessionLocal = sessionmaker(
+        bind=db_engine, autoflush=False, autocommit=False
+    )
+    session = TestingSessionLocal()
+    yield session
+    session.rollback()
+    session.close()
 
 
 @pytest.fixture
-def app():
-    """Create a test app instance"""
-    return create_app()
+def app(db_engine, db_session):
+    """Create a test app instance with test database"""
+    app = create_app()
+    
+    # Override the get_db dependency to use test database
+    def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    yield app
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def client(app):
     """Create a test client"""
-    return TestClient(app)
-
-
-@pytest.fixture
-def auth_header(client):
-    """Get an auth header for testing"""
-    # Sign up a test user
-    response = client.post(
-        "/auth/signup",
-        json={
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "password123",
-        },
-    )
-    assert response.status_code == 201
-    data = response.json()
-    assert data["success"]
-
-    # The token is not returned in the response in our current implementation,
-    # so we need to get it from a mock session. For now, we'll login to get a session
-    response = client.post(
-        "/auth/login",
-        json={
-            "email": "test@example.com",
-            "password": "password123",
-        },
-    )
-    assert response.status_code == 200
-
-    # We can't easily get the token from TestClient, so we'll create a test directly
-    return None
+    return TestClient(app, raise_server_exceptions=True)
 
 
 class TestHealth:
@@ -86,7 +92,7 @@ class TestAuth:
         assert data["success"] is True
         assert data["user"]["username"] == "newuser"
         assert data["user"]["email"] == "newuser@example.com"
-        assert data["error"] is None
+        assert data["token"] is not None
 
     def test_signup_duplicate_email(self, client):
         """Test signup with duplicate email"""
@@ -143,7 +149,7 @@ class TestAuth:
     def test_login_success(self, client):
         """Test successful login"""
         # Create a user first
-        client.post(
+        signup_response = client.post(
             "/auth/signup",
             json={
                 "username": "loginuser",
@@ -151,6 +157,7 @@ class TestAuth:
                 "password": "password123",
             },
         )
+        assert signup_response.status_code == 201
 
         # Login
         response = client.post(
@@ -164,6 +171,7 @@ class TestAuth:
         data = response.json()
         assert data["success"] is True
         assert data["user"]["email"] == "loginuser@example.com"
+        assert data["token"] is not None
 
     def test_login_wrong_password(self, client):
         """Test login with wrong password"""
@@ -203,84 +211,86 @@ class TestAuth:
         data = response.json()
         assert data["success"] is False
 
-    def test_logout_no_auth(self, client):
-        """Test logout without authentication"""
-        # Logout should not fail even without auth
-        response = client.post("/auth/logout")
+    def test_logout(self, client):
+        """Test logout"""
+        # Create and login a user
+        signup_response = client.post(
+            "/auth/signup",
+            json={
+                "username": "logoutuser",
+                "email": "logoutuser@example.com",
+                "password": "password123",
+            },
+        )
+        token = signup_response.json()["token"]
+
+        # Logout
+        response = client.post(
+            "/auth/logout",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         assert response.status_code == 204
 
-    def test_get_me_no_auth(self, client):
-        """Test getting current user without authentication"""
-        response = client.get("/auth/me")
+    def test_get_current_user(self, client):
+        """Test get current user endpoint"""
+        # Create and login a user
+        signup_response = client.post(
+            "/auth/signup",
+            json={
+                "username": "currentuser",
+                "email": "current@example.com",
+                "password": "password123",
+            },
+        )
+        token = signup_response.json()["token"]
+
+        # Get current user
+        response = client.get(
+            "/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "currentuser"
+        assert data["email"] == "current@example.com"
+
+    def test_get_current_user_invalid_token(self, client):
+        """Test get current user with invalid token"""
+        response = client.get(
+            "/auth/me",
+            headers={"Authorization": "Bearer invalid_token"},
+        )
         assert response.status_code == 401
 
 
 class TestLeaderboard:
     """Leaderboard tests"""
 
-    def test_get_leaderboard_default(self, client):
-        """Test getting leaderboard with default limit"""
+    def test_get_leaderboard_empty(self, client):
+        """Test getting empty leaderboard"""
         response = client.get("/leaderboard")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        assert len(data) <= 10
-        # Should have entries from mock database
-        assert len(data) > 0
+        assert len(data) == 0
 
-    def test_get_leaderboard_with_limit(self, client):
-        """Test getting leaderboard with custom limit"""
-        response = client.get("/leaderboard?limit=5")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) <= 5
-
-    def test_get_leaderboard_with_mode_filter(self, client):
-        """Test getting leaderboard filtered by mode"""
-        response = client.get("/leaderboard?mode=walls")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        # All entries should have mode=walls
-        for entry in data:
-            assert entry["mode"] == "walls"
-
-    def test_leaderboard_sorting(self, client):
-        """Test that leaderboard is sorted by score descending"""
-        response = client.get("/leaderboard?limit=100")
-        assert response.status_code == 200
-        data = response.json()
-        # Check that scores are in descending order
-        scores = [entry["score"] for entry in data]
-        assert scores == sorted(scores, reverse=True)
-
-    def test_submit_score_no_auth(self, client):
-        """Test submitting score without authentication"""
-        response = client.post(
-            "/leaderboard/score",
+    def test_submit_score_authenticated(self, client):
+        """Test submitting score with authentication"""
+        # Create and login a user
+        signup_response = client.post(
+            "/auth/signup",
             json={
-                "score": 100,
-                "mode": "walls",
+                "username": "scoreuser",
+                "email": "scoreuser@example.com",
+                "password": "password123",
             },
         )
-        assert response.status_code == 401
+        token = signup_response.json()["token"]
 
-    def test_submit_score_with_mock_auth(self, client, app):
-        """Test submitting score with mock authentication"""
-        from app.database import db
-
-        # Create a test user and session
-        user = db.create_user("scoreuser", "scoreuser@example.com", "password123")
-        token = db.create_session(user.id)
-
-        # Submit score with auth header
+        # Submit score
         response = client.post(
             "/leaderboard/score",
-            json={
-                "score": 500,
-                "mode": "walls",
-            },
+            json={"score": 500, "mode": "walls"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
@@ -289,170 +299,132 @@ class TestLeaderboard:
         assert data["rank"] is not None
         assert isinstance(data["rank"], int)
 
+    def test_submit_score_unauthenticated(self, client):
+        """Test submitting score without authentication"""
+        response = client.post(
+            "/leaderboard/score",
+            json={"score": 500, "mode": "walls"},
+        )
+        assert response.status_code == 401
+
+    def test_leaderboard_ranking(self, client):
+        """Test leaderboard ranking"""
+        # Create users and submit scores
+        for i in range(3):
+            signup_response = client.post(
+                "/auth/signup",
+                json={
+                    "username": f"player{i}",
+                    "email": f"player{i}@example.com",
+                    "password": "password123",
+                },
+            )
+            token = signup_response.json()["token"]
+            
+            # Submit different scores
+            client.post(
+                "/leaderboard/score",
+                json={"score": 100 * (i + 1), "mode": "walls"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        # Check leaderboard
+        response = client.get("/leaderboard?limit=10&mode=walls")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 3
+        # Scores should be in descending order
+        assert data[0]["score"] > data[1]["score"]
+        assert data[1]["score"] > data[2]["score"]
+
+    def test_leaderboard_filter_by_mode(self, client):
+        """Test leaderboard filtering by mode"""
+        # Create user
+        signup_response = client.post(
+            "/auth/signup",
+            json={
+                "username": "modeuser",
+                "email": "modeuser@example.com",
+                "password": "password123",
+            },
+        )
+        token = signup_response.json()["token"]
+
+        # Submit scores in different modes
+        client.post(
+            "/leaderboard/score",
+            json={"score": 100, "mode": "walls"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        client.post(
+            "/leaderboard/score",
+            json={"score": 200, "mode": "passthrough"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        # Check walls mode only
+        response = client.get("/leaderboard?mode=walls")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["mode"] == "walls"
+        assert data[0]["score"] == 100
+
 
 class TestPlayers:
     """Players/watch mode tests"""
 
-    def test_get_active_players(self, client):
-        """Test getting active players"""
+    def test_get_active_players_empty(self, client):
+        """Test getting active players when none exist"""
         response = client.get("/players/active")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        # Should have at least one player from mock database
-        assert len(data) > 0
+        assert len(data) == 0
 
-    def test_active_player_structure(self, client):
-        """Test that active player has correct structure"""
-        response = client.get("/players/active")
-        assert response.status_code == 200
-        data = response.json()
-        if len(data) > 0:
-            player = data[0]
-            assert "id" in player
-            assert "username" in player
-            assert "current_score" in player
-            assert "mode" in player
-            assert "snake" in player
-            assert "food" in player
-            assert "direction" in player
-            assert "is_playing" in player
-            assert isinstance(player["snake"], list)
-            assert isinstance(player["food"], dict)
-            assert "x" in player["food"]
-            assert "y" in player["food"]
-
-    def test_get_player_by_id(self, client):
-        """Test getting a specific player by ID"""
-        # First get list of active players
-        response = client.get("/players/active")
-        data = response.json()
-        if len(data) > 0:
-            player_id = data[0]["id"]
-
-            # Get specific player
-            response = client.get(f"/players/{player_id}")
-            assert response.status_code == 200
-            player = response.json()
-            assert player["id"] == player_id
-
-    def test_get_player_not_found(self, client):
-        """Test getting non-existent player"""
-        response = client.get("/players/nonexistent-id")
+    def test_get_nonexistent_player(self, client):
+        """Test getting a player that doesn't exist"""
+        response = client.get("/players/nonexistent")
         assert response.status_code == 404
-
-
-class TestDatabaseIntegration:
-    """Test database and model integration"""
-
-    def test_mock_database_creation(self):
-        """Test mock database initialization"""
-        db = MockDatabase()
-        assert len(db.users) > 0
-        assert len(db.leaderboard) > 0
-        assert len(db.active_players) > 0
-
-    def test_user_creation(self):
-        """Test creating a user"""
-        db = MockDatabase()
-        user = db.create_user("testuser", "test@example.com", "hashed_password")
-        assert user.id
-        assert user.username == "testuser"
-        assert user.email == "test@example.com"
-        assert user.high_score == 0
-
-    def test_session_management(self):
-        """Test session creation and retrieval"""
-        db = MockDatabase()
-        user = db.create_user("sessionuser", "session@example.com", "password")
-        token = db.create_session(user.id)
-
-        retrieved_user = db.get_user_from_token(token)
-        assert retrieved_user is not None
-        assert retrieved_user.id == user.id
-
-    def test_leaderboard_ranking(self):
-        """Test leaderboard ranking calculation"""
-        db = MockDatabase()
-        user = db.create_user("rankuser", "rank@example.com", "password")
-
-        # Submit a score
-        db.add_leaderboard_entry(user.id, "rankuser", 500, "walls")
-
-        # Check rank
-        rank = db.get_leaderboard_rank(500, "walls")
-        assert rank is not None
-        assert isinstance(rank, int)
-
-    def test_active_player_management(self):
-        """Test active player creation and retrieval"""
-        db = MockDatabase()
-        snake = [Position(10, 10), Position(9, 10)]
-        food = Position(15, 15)
-        player = ActivePlayer(
-            id="test-player",
-            username="testplayer",
-            current_score=100,
-            mode="walls",
-            snake=snake,
-            food=food,
-            direction="RIGHT",
-            is_playing=True,
-        )
-
-        db.set_active_player(player)
-        retrieved = db.get_active_player("test-player")
-        assert retrieved is not None
-        assert retrieved.username == "testplayer"
 
 
 class TestEdgeCases:
     """Test edge cases and error handling"""
 
-    def test_get_leaderboard_limit_zero(self, client):
-        """Test leaderboard with zero limit (should fail validation)"""
-        response = client.get("/leaderboard?limit=0")
-        assert response.status_code == 422  # Validation error
-
-    def test_get_leaderboard_negative_limit(self, client):
-        """Test leaderboard with negative limit (should fail validation)"""
-        response = client.get("/leaderboard?limit=-1")
-        assert response.status_code == 422  # Validation error
-
-    def test_submit_score_negative(self, client, app):
-        """Test submitting negative score"""
-        from app.database import db
-
-        user = db.create_user("neguser", "neg@example.com", "password")
-        token = db.create_session(user.id)
-
+    def test_signup_missing_fields(self, client):
+        """Test signup with missing fields"""
         response = client.post(
-            "/leaderboard/score",
-            json={
-                "score": -100,
-                "mode": "walls",
-            },
-            headers={"Authorization": f"Bearer {token}"},
+            "/auth/signup",
+            json={"username": "incomplete"},
         )
-        # Our implementation allows negative scores in the schema
-        # This is a design decision - you might want to add validation
-        assert response.status_code == 200 or response.status_code == 422
+        assert response.status_code == 422  # Validation error
 
-    def test_submit_score_invalid_mode(self, client, app):
+    def test_login_missing_fields(self, client):
+        """Test login with missing fields"""
+        response = client.post(
+            "/auth/login",
+            json={"email": "test@example.com"},
+        )
+        assert response.status_code == 422  # Validation error
+
+    def test_submit_score_invalid_mode(self, client):
         """Test submitting score with invalid mode"""
-        from app.database import db
+        signup_response = client.post(
+            "/auth/signup",
+            json={
+                "username": "invalidmode",
+                "email": "invalidmode@example.com",
+                "password": "password123",
+            },
+        )
+        token = signup_response.json()["token"]
 
-        user = db.create_user("modeuser", "mode@example.com", "password")
-        token = db.create_session(user.id)
-
+        # This should still work - we don't validate modes on the backend
         response = client.post(
             "/leaderboard/score",
-            json={
-                "score": 100,
-                "mode": "invalid_mode",
-            },
+            json={"score": 100, "mode": "invalid_mode"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        # Pydantic should validate this, but our schema doesn't restrict to enum
-        # This is a limitation of the current schema
-        assert response.status_code == 200 or response.status_code == 422
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True

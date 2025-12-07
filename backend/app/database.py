@@ -2,8 +2,7 @@
 import os
 from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Integer, DateTime, ForeignKey, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
+from sqlalchemy.orm import sessionmaker, Session, relationship, declarative_base
 import uuid
 
 # Database configuration
