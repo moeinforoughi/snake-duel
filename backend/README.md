@@ -47,16 +47,6 @@ cd backend
 uv run pytest -q
 ```
 
-Seed the database with fake data (optional)
-The mock database comes with a few sample users and leaderboard entries. To add more fake data for testing:
-
-```bash
-cd backend
-uv run python seed_db.py
-```
-
-This adds more users, leaderboard entries, and active players so you have richer data to explore.
-
 API examples
 - Health: `GET /health`
 
@@ -94,12 +84,19 @@ curl -X POST -H "Content-Type: application/json" \
 
 Important note about authentication (mock DB)
 - This mock backend stores session tokens server-side in `app.database.db.sessions` and DOES NOT expose those tokens in HTTP responses.
-- For integration tests or local experimentation you can create a token from a Python REPL and then use it in an `Authorization: Bearer <token>` header when calling protected endpoints (for example, `POST /leaderboard/score`). Example:
+- To test authenticated endpoints (for example, `POST /leaderboard/score`), first create a user via signup, then create a session token and use it in the `Authorization: Bearer <token>` header. Example:
 
 ```bash
+# 1. Signup a user
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"password"}' \
+  http://localhost:4000/auth/signup
+
+# 2. Create a session token from a Python REPL
 cd backend
 uv run python -c "from app.database import db; u=list(db.users.values())[0]; token=db.create_session(u.id); print(token)"
-# then use the printed token in requests
+
+# 3. Use the token in requests
 curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer <TOKEN>" \
   -d '{"score":100,"mode":"walls"}' http://localhost:4000/leaderboard/score
 ```

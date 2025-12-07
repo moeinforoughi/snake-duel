@@ -1,0 +1,19 @@
+{
+  "name": "snake-duel",
+  "version": "1.0.0",
+  "description": "Snake Duel - Multiplayer snake game",
+  "private": true,
+  "scripts": {
+    "cleanup": "bash ./cleanup.sh",
+    "dev": "npm run cleanup && concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "dev:no-cleanup": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && make serve",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:run": "cd backend && make run",
+    "frontend:build": "cd frontend && npm run build",
+    "build": "npm run frontend:build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
