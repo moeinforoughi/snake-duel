@@ -1,8 +1,5 @@
 # Snake Duel
 
-````markdown
-# Snake Duel
-
 ## Quick Start (Run Both Frontend & Backend)
 
 The easiest way to run the entire project is using the root `package.json` script:
@@ -255,5 +252,3 @@ snake-duel/
 - All frontend code is in `frontend/src/`.
 - All frontend tests are in `frontend/test/`.
 - Ensure `backend/.venv/`, `node_modules/` and DB files are listed in `.gitignore` to avoid committing them.
-
-````
