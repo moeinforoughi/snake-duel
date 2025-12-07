@@ -9,7 +9,7 @@ backend/.pytest_cache/
 backend/.env
 backend/.env.local
 backend/.env.*.local
-
+.pytest_cache
 # Backend - Database files
 backend/*.db
 backend/*.sqlite

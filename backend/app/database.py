@@ -8,13 +8,12 @@ import uuid
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///./snake_duel.db"  # Default to SQLite for development
+    "postgresql://snakeuser:snakepass@localhost:5432/snake_duel"  # Default to Postgres for development
 )
 
 # Create engine
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
     echo=os.getenv("SQL_ECHO", "false").lower() == "true",  # Debug SQL queries if needed
 )
 

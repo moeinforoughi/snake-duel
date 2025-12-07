@@ -33,7 +33,7 @@ export interface ActivePlayer {
   isPlaying: boolean;
 }
 
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:4000';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || '/api';
 const TOKEN_KEY = 'sd_token';
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {

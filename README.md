@@ -1,4 +1,7 @@
-# How to Run Snake Duel
+# Snake Duel
+
+````markdown
+# Snake Duel
 
 ## Quick Start (Run Both Frontend & Backend)
 
@@ -17,23 +20,9 @@ This command automatically:
 - **Backend** runs on `http://localhost:4000` (FastAPI with Uvicorn)
 - **Frontend** runs on `http://localhost:8080` (Vite + React)
 
-**Expected Output:**
-```
-✓ Port 4000 is free
-✓ Port 8080 is free
-✓ Cleanup complete! Ports are ready.
-
-> snake-duel@1.0.0 dev
-> concurrently "npm run backend:dev" "npm run frontend:dev"
-
-[0] Starting uvicorn with --reload on port 4000
-[1] VITE v5.4.19 ready in 552 ms
-[1] ➜  Local:   http://localhost:8080/
-```
-
 Both services will start in watch/reload mode, meaning changes to code will automatically reload the applications.
 
-### Manual Cleanup (Optional)
+## Manual Cleanup (Optional)
 
 If you need to manually clean up ports without starting the dev server:
 
@@ -64,24 +53,24 @@ npm run dev:no-cleanup
 ### Setup Backend
 
 1. **Navigate to the backend directory:**
-   ```bash
-   cd backend
-   ```
+	```bash
+	cd backend
+	```
 
 2. **Sync dependencies:**
-   ```bash
-   make sync
-   ```
-   Or manually:
-   ```bash
-   uv sync
-   ```
+	```bash
+	make sync
+	```
+	Or manually:
+	```bash
+	uv sync
+	```
 
 3. **Run the backend:**
-   ```bash
-   make serve
-   ```
-   The backend will start on `http://localhost:4000` with auto-reload enabled.
+	```bash
+	make serve
+	```
+	The backend will start on `http://localhost:4000` with auto-reload enabled.
 
 **Backend Makefile Commands:**
 - `make sync` - Sync dependencies from lockfile
@@ -92,20 +81,20 @@ npm run dev:no-cleanup
 ### Setup Frontend
 
 1. **Navigate to the frontend directory:**
-   ```bash
-   cd frontend
-   ```
+	```bash
+	cd frontend
+	```
 
 2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+	```bash
+	npm install
+	```
 
 3. **Run the frontend in development mode:**
-   ```bash
-   npm run dev
-   ```
-   The frontend will start on `http://localhost:8080` with Vite's hot module replacement.
+	```bash
+	npm run dev
+	```
+	The frontend will start on `http://localhost:8080` with Vite's hot module replacement.
 
 **Frontend npm Commands:**
 - `npm run dev` - Start development server
@@ -154,6 +143,33 @@ npm run build
 When using `npm run dev`, press `CTRL+C` in the terminal to stop both services.
 
 When running separately, press `CTRL+C` in each terminal.
+
+---
+
+## Running Tests
+
+### Backend Tests
+
+From the backend directory:
+
+```bash
+uv run python -m pytest tests/
+```
+
+Or using the Makefile:
+
+```bash
+cd backend
+make test
+```
+
+### Frontend Tests
+
+From the frontend directory:
+
+```bash
+npm run test
+```
 
 ---
 
@@ -232,3 +248,12 @@ snake-duel/
 - **Backend:** Python, FastAPI, Uvicorn
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn/ui
 - **Concurrency:** concurrently (npm package for running multiple processes)
+
+## Notes
+- All backend code is in `backend/app/`.
+- All backend tests are in `backend/tests/`.
+- All frontend code is in `frontend/src/`.
+- All frontend tests are in `frontend/test/`.
+- Ensure `backend/.venv/`, `node_modules/` and DB files are listed in `.gitignore` to avoid committing them.
+
+````
