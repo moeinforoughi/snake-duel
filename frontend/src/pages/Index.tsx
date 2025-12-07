@@ -38,7 +38,11 @@ function GameApp() {
         <Navigation currentView={currentView} onViewChange={setCurrentView} />
         
         <div className="mt-6">
-          {renderView()}
+          {currentView === 'play' ? (
+            <SnakeGame isModalOpen={isAuthModalOpen} />
+          ) : (
+            renderView()
+          )}
         </div>
       </main>
 

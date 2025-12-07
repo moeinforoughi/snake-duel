@@ -20,7 +20,11 @@ import {
 
 const GRID_SIZE = 20;
 
-export default function SnakeGame() {
+interface SnakeGameProps {
+  isModalOpen?: boolean;
+}
+
+export default function SnakeGame({ isModalOpen = false }: SnakeGameProps) {
   const { user } = useAuth();
   const [gameState, setGameState] = useState<GameState>(() => 
     createInitialState(GRID_SIZE, 'passthrough')
@@ -31,6 +35,11 @@ export default function SnakeGame() {
   // Handle keyboard input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore game keys when modal is open
+      if (isModalOpen) {
+        return;
+      }
+
       if (e.key === ' ' || e.key === 'Escape') {
         e.preventDefault();
         setGameState(prev => togglePause(prev));
@@ -46,7 +55,7 @@ export default function SnakeGame() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isModalOpen]);
   
   // Game loop
   useEffect(() => {
