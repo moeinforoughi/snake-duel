@@ -32,6 +32,7 @@ class AuthResult(BaseModel):
     success: bool
     user: Optional[UserSchema] = None
     error: Optional[str] = None
+    token: Optional[str] = None
 
 
 class LeaderboardEntrySchema(BaseModel):

@@ -53,6 +53,7 @@ def login(request: LoginRequest) -> AuthResult:
             high_score=user.high_score,
         ),
         error=None,
+        token=token,
     )
 
 
@@ -82,6 +83,7 @@ def signup(request: SignupRequest) -> AuthResult:
             high_score=user.high_score,
         ),
         error=None,
+        token=token,
     )
 
 
