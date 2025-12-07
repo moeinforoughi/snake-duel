@@ -26,3 +26,7 @@ backend/snake_duel.db
 
 # OS specific
 Thumbs.db
+
+# Integration test artifacts
+tests_integration/__pycache__/
+tests_integration/*.db
