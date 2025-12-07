@@ -1,7 +1,8 @@
-"""Leaderboard routes (package version)"""
+"""Leaderboard routes using SQLAlchemy"""
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 from typing import Optional
-from .database import db, User
+from .database import get_db, User, LeaderboardEntry
 from .schemas import LeaderboardEntrySchema, ScoreSubmissionRequest, ScoreSubmissionResult
 from .routes_auth import get_current_user
 
@@ -12,8 +13,19 @@ router = APIRouter(tags=["leaderboard"])
 def get_leaderboard(
     limit: int = Query(10, ge=1),
     mode: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
 ) -> list[LeaderboardEntrySchema]:
-    entries = db.get_leaderboard(limit=limit, mode=mode)
+    """Get leaderboard entries, optionally filtered by mode"""
+    query = db.query(LeaderboardEntry)
+    
+    if mode:
+        query = query.filter(LeaderboardEntry.mode == mode)
+    
+    # Sort by score descending, then by date descending
+    entries = query.order_by(
+        LeaderboardEntry.score.desc(),
+        LeaderboardEntry.date.desc()
+    ).limit(limit).all()
 
     return [
         LeaderboardEntrySchema(
@@ -32,14 +44,30 @@ def get_leaderboard(
 def submit_score(
     request: ScoreSubmissionRequest,
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> ScoreSubmissionResult:
-    entry = db.add_leaderboard_entry(
+    """Submit a score to the leaderboard"""
+    # Create leaderboard entry
+    entry = LeaderboardEntry(
         user_id=user.id,
         username=user.username,
         score=request.score,
         mode=request.mode,
     )
+    db.add(entry)
+    
+    # Update user's high score if needed
+    if request.score > user.high_score:
+        user.high_score = request.score
+    
+    db.commit()
+    db.refresh(entry)
 
-    rank = db.get_leaderboard_rank(request.score, mode=request.mode)
+    # Calculate rank (how many entries have a higher score in this mode)
+    rank_query = db.query(LeaderboardEntry).filter(
+        LeaderboardEntry.mode == request.mode,
+        LeaderboardEntry.score > request.score
+    ).count()
+    rank = rank_query + 1  # Rank is 1-indexed
 
     return ScoreSubmissionResult(success=True, rank=rank)

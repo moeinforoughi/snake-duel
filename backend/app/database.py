@@ -1,204 +1,144 @@
-"""Mock database for Snake Duel API (package version)"""
-from datetime import datetime, timedelta
-from typing import Optional
+"""Database configuration and models using SQLAlchemy ORM"""
+import os
+from datetime import datetime
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, ForeignKey, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session, relationship
 import uuid
 
+# Database configuration
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./snake_duel.db"  # Default to SQLite for development
+)
 
-class User:
+# Create engine
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    echo=os.getenv("SQL_ECHO", "false").lower() == "true",  # Debug SQL queries if needed
+)
+
+# Create session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create base for models
+Base = declarative_base()
+
+
+class User(Base):
     """User model"""
+    __tablename__ = "users"
 
-    def __init__(
-        self,
-        id: str,
-        username: str,
-        email: str,
-        password_hash: str,
-        created_at: datetime,
-        high_score: int = 0,
-    ):
-        self.id = id
-        self.username = username
-        self.email = email
-        self.password_hash = password_hash
-        self.created_at = created_at
-        self.high_score = high_score
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    username = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    high_score = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    # Relationships
+    leaderboard_entries = relationship("LeaderboardEntry", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "high_score": self.high_score,
+            "created_at": self.created_at,
+        }
 
 
-class LeaderboardEntry:
+class LeaderboardEntry(Base):
     """Leaderboard entry model"""
+    __tablename__ = "leaderboard_entries"
 
-    def __init__(
-        self,
-        id: str,
-        user_id: str,
-        username: str,
-        score: int,
-        mode: str,
-        date: datetime,
-    ):
-        self.id = id
-        self.user_id = user_id
-        self.username = username
-        self.score = score
-        self.mode = mode
-        self.date = date
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    username = Column(String(255), nullable=False)  # Denormalized for easy access
+    score = Column(Integer, nullable=False)
+    mode = Column(String(50), nullable=False, index=True)  # 'walls' or 'passthrough'
+    date = Column(DateTime, default=datetime.now, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
+    # Relationships
+    user = relationship("User", back_populates="leaderboard_entries")
 
-class Position:
-    """Position model for snake and food"""
-
-    def __init__(self, x: int, y: int):
-        self.x = x
-        self.y = y
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "username": self.username,
+            "score": self.score,
+            "mode": self.mode,
+            "date": self.date,
+        }
 
 
-class ActivePlayer:
+class Session(Base):
+    """Session/Token model for authentication"""
+    __tablename__ = "sessions"
+
+    token = Column(String(36), primary_key=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # Optional expiration
+
+    # Relationships
+    user = relationship("User", back_populates="sessions")
+
+    def to_dict(self):
+        return {
+            "token": self.token,
+            "user_id": self.user_id,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+        }
+
+
+class ActivePlayer(Base):
     """Active player in watch mode"""
+    __tablename__ = "active_players"
 
-    def __init__(
-        self,
-        id: str,
-        username: str,
-        current_score: int,
-        mode: str,
-        snake: list[Position],
-        food: Position,
-        direction: str,
-        is_playing: bool,
-    ):
-        self.id = id
-        self.username = username
-        self.current_score = current_score
-        self.mode = mode
-        self.snake = snake
-        self.food = food
-        self.direction = direction
-        self.is_playing = is_playing
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    username = Column(String(255), nullable=False)
+    current_score = Column(Integer, default=0)
+    mode = Column(String(50), nullable=False)  # 'walls' or 'passthrough'
+    snake_json = Column(String(1000), nullable=False)  # JSON string of snake positions
+    food_x = Column(Integer, nullable=False)
+    food_y = Column(Integer, nullable=False)
+    direction = Column(String(10), nullable=False)  # 'UP', 'DOWN', 'LEFT', 'RIGHT'
+    is_playing = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
-
-class MockDatabase:
-    """Mock database for development"""
-
-    def __init__(self):
-        self.users: dict[str, User] = {}
-        self.leaderboard: list[LeaderboardEntry] = []
-        self.active_players: dict[str, ActivePlayer] = {}
-        self.sessions: dict[str, str] = {}  # token -> user_id
-
-    def create_user(self, username: str, email: str, password_hash: str) -> User:
-        """Create a new user"""
-        user_id = str(uuid.uuid4())
-        user = User(
-            id=user_id,
-            username=username,
-            email=email,
-            password_hash=password_hash,
-            created_at=datetime.now(),
-            high_score=0,
-        )
-        self.users[user_id] = user
-        return user
-
-    def get_user_by_id(self, user_id: str) -> Optional[User]:
-        """Get user by ID"""
-        return self.users.get(user_id)
-
-    def get_user_by_email(self, email: str) -> Optional[User]:
-        """Get user by email"""
-        for user in self.users.values():
-            if user.email == email:
-                return user
-        return None
-
-    def get_user_by_username(self, username: str) -> Optional[User]:
-        """Get user by username"""
-        for user in self.users.values():
-            if user.username == username:
-                return user
-        return None
-
-    def create_session(self, user_id: str) -> str:
-        """Create a session token for a user"""
-        token = str(uuid.uuid4())
-        self.sessions[token] = user_id
-        return token
-
-    def get_user_from_token(self, token: str) -> Optional[User]:
-        """Get user from session token"""
-        user_id = self.sessions.get(token)
-        if user_id:
-            return self.get_user_by_id(user_id)
-        return None
-
-    def delete_session(self, token: str) -> bool:
-        """Delete a session"""
-        if token in self.sessions:
-            del self.sessions[token]
-            return True
-        return False
-
-    def add_leaderboard_entry(
-        self, user_id: str, username: str, score: int, mode: str
-    ) -> LeaderboardEntry:
-        """Add a leaderboard entry"""
-        entry = LeaderboardEntry(
-            id=str(uuid.uuid4()),
-            user_id=user_id,
-            username=username,
-            score=score,
-            mode=mode,
-            date=datetime.now(),
-        )
-        self.leaderboard.append(entry)
-
-        # Update user's high score if needed
-        user = self.get_user_by_id(user_id)
-        if user and score > user.high_score:
-            user.high_score = score
-
-        return entry
-
-    def get_leaderboard(self, limit: int = 10, mode: Optional[str] = None) -> list[LeaderboardEntry]:
-        """Get leaderboard entries, optionally filtered by mode"""
-        entries = self.leaderboard
-        if mode:
-            entries = [e for e in entries if e.mode == mode]
-
-        # Sort by score descending, then by date descending
-        sorted_entries = sorted(
-            entries, key=lambda e: (-e.score, -e.date.timestamp())
-        )
-        if limit is None:
-            return sorted_entries
-        return sorted_entries[:limit]
-
-    def get_leaderboard_rank(self, score: int, mode: Optional[str] = None) -> Optional[int]:
-        """Get the rank of a score in the leaderboard"""
-        leaderboard = self.get_leaderboard(limit=None, mode=mode)
-        for i, entry in enumerate(leaderboard, 1):
-            if entry.score <= score:
-                return i
-        return None
-
-    def set_active_player(self, player: ActivePlayer) -> None:
-        """Set an active player"""
-        self.active_players[player.id] = player
-
-    def get_active_player(self, player_id: str) -> Optional[ActivePlayer]:
-        """Get an active player by ID"""
-        return self.active_players.get(player_id)
-
-    def get_all_active_players(self) -> list[ActivePlayer]:
-        """Get all active players"""
-        return list(self.active_players.values())
-
-    def remove_active_player(self, player_id: str) -> bool:
-        """Remove an active player"""
-        if player_id in self.active_players:
-            del self.active_players[player_id]
-            return True
-        return False
+    def to_dict(self):
+        import json
+        return {
+            "id": self.id,
+            "username": self.username,
+            "current_score": self.current_score,
+            "mode": self.mode,
+            "snake": json.loads(self.snake_json),
+            "food": {"x": self.food_x, "y": self.food_y},
+            "direction": self.direction,
+            "is_playing": self.is_playing,
+        }
 
 
-# Global database instance
-db = MockDatabase()
+def get_db():
+    """Dependency injection for database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db():
+    """Initialize database tables"""
+    Base.metadata.create_all(bind=engine)

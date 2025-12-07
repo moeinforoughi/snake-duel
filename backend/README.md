@@ -1,9 +1,10 @@
 # Snake Duel — Backend
 
-This directory contains a small FastAPI backend for the Snake Duel project. It uses a mock in-memory database for development and tests. The application is organized as a package under `backend/app/`.
+This directory contains a FastAPI backend for the Snake Duel project using SQLAlchemy ORM with support for both SQLite (development) and PostgreSQL (production). The application is organized as a package under `backend/app/`.
 
 Quick overview
-- App package: `backend/app/` (contains `database.py`, `schemas.py`, and route modules)
+- App package: `backend/app/` (contains SQLAlchemy models, schemas, and route modules)
+- Database: SQLAlchemy ORM with SQLite (dev) and PostgreSQL (production) support
 - Entrypoint: `backend/main.py` (creates the FastAPI `app` instance)
 - Tests: `backend/test_main.py` (pytest-based)
 
@@ -23,6 +24,25 @@ This will create a local virtual environment at `backend/.venv` and install all 
 
 (Alternatively, use `uv sync` to install only production dependencies.)
 
+Database Configuration
+
+**Development (SQLite - Default)**
+No configuration needed. SQLite database will be created automatically at `backend/snake_duel.db`
+
+**Production (PostgreSQL)**
+Set the `DATABASE_URL` environment variable:
+
+```bash
+export DATABASE_URL="postgresql://user:password@localhost:5432/snake_duel"
+```
+
+Or create a `.env` file (see `.env.example`):
+
+```bash
+cp .env.example .env
+# Edit .env with your database URL
+```
+
 Run the server (development)
 Simple (recommended for development):
 
@@ -31,7 +51,9 @@ cd backend
 uv run python main.py
 ```
 
-This runs the `main.py` which starts a uvicorn server on `0.0.0.0:4000`.
+This runs the `main.py` which:
+1. Initializes the database (creates tables if needed)
+2. Starts a uvicorn server on `0.0.0.0:4000`
 
 Alternative (run uvicorn directly):
 
@@ -66,15 +88,23 @@ curl http://localhost:4000/leaderboard
 curl http://localhost:4000/players/active
 ```
 
-- Signup (creates a mock user):
+- Signup (creates a new user and returns auth token):
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"username":"alice","email":"alice@example.com","password":"password"}' \
   http://localhost:4000/auth/signup
+
+# Response:
+# {
+#   "success": true,
+#   "user": {...},
+#   "token": "uuid-token-here",
+#   "error": null
+# }
 ```
 
-- Login (returns AuthResult but does not currently return a token in the mock implementation):
+- Login (returns auth token):
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -82,39 +112,47 @@ curl -X POST -H "Content-Type: application/json" \
   http://localhost:4000/auth/login
 ```
 
-Important note about authentication (mock DB)
-- This mock backend stores session tokens server-side in `app.database.db.sessions` and DOES NOT expose those tokens in HTTP responses.
-- To test authenticated endpoints (for example, `POST /leaderboard/score`), first create a user via signup, then create a session token and use it in the `Authorization: Bearer <token>` header. Example:
+- Submit score (requires authentication):
 
 ```bash
-# 1. Signup a user
+# Use the token from signup/login
+TOKEN="your-token-from-signup"
+
 curl -X POST -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"password"}' \
-  http://localhost:4000/auth/signup
-
-# 2. Create a session token from a Python REPL
-cd backend
-uv run python -c "from app.database import db; u=list(db.users.values())[0]; token=db.create_session(u.id); print(token)"
-
-# 3. Use the token in requests
-curl -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer <TOKEN>" \
-  -d '{"score":100,"mode":"walls"}' http://localhost:4000/leaderboard/score
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"score":100,"mode":"walls"}' \
+  http://localhost:4000/leaderboard/score
 ```
 
+Authentication & Sessions
+- Tokens are persisted in the database (SQLite or PostgreSQL)
+- Tokens are returned in auth responses and must be stored by the client
+- Use `Authorization: Bearer <token>` header for authenticated requests
+- Tokens are created on signup and login, and deleted on logout
+- The frontend automatically stores tokens in localStorage and includes them in all API requests
+
 Project layout (relevant files)
-- `backend/app/database.py` — mock database and models
-- `backend/app/schemas.py` — pydantic schemas
-- `backend/app/routes_auth.py` — auth endpoints
-- `backend/app/routes_leaderboard.py` — leaderboard endpoints
-- `backend/app/routes_players.py` — watch mode / players endpoints
-- `backend/main.py` — app factory and server entrypoint
+- `backend/app/database.py` — SQLAlchemy ORM models (User, LeaderboardEntry, Session, ActivePlayer)
+- `backend/app/schemas.py` — Pydantic request/response schemas
+- `backend/app/routes_auth.py` — Authentication endpoints (signup, login, logout, me)
+- `backend/app/routes_leaderboard.py` — Leaderboard endpoints
+- `backend/app/routes_players.py` — Watch mode / active players endpoints
+- `backend/main.py` — FastAPI app factory and server entrypoint
+- `backend/.env.example` — Environment variables template
 - `backend/test_main.py` — pytest suite
 
-Notes & next steps
-- The mock DB is temporary. When ready, replace `app.database` with a persistent store (SQLite/Postgres) and return tokens from `login/signup` endpoints.
-- Consider adding a small `.env` or configuration for host/port and secrets when moving to a non-mock DB.
+Notes & Next Steps
+- ✅ Database: SQLAlchemy ORM with SQLite (dev) and PostgreSQL (production) support
+- ✅ Authentication: Tokens stored in database and returned from endpoints
+- TODO: Add password hashing (use `bcrypt` or `argon2`)
+- TODO: Setup Alembic for schema migrations
+- TODO: Add database constraints and indexes for better performance
+- TODO: Consider JWT tokens for stateless authentication at scale
+- TODO: Add Docker/docker-compose for containerized development
 
-If you'd like, I can:
-- Move `main.py` inside the `app/` package and expose `create_app` from `app.__init__` for a cleaner package layout;
-- Add a small Dockerfile and `docker-compose` for local development;
-- Make auth endpoints return JWT tokens for real integrations.
+Future Improvements
+- Add relationship eager loading optimization to reduce N+1 queries
+- Implement token expiration
+- Add rate limiting for auth endpoints
+- Setup database backup and recovery procedures
+- Add logging and monitoring

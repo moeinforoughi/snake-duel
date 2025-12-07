@@ -4,10 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes_auth import router as auth_router
 from app.routes_leaderboard import router as leaderboard_router
 from app.routes_players import router as players_router
+from app.database import init_db
 
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application"""
+    # Initialize database
+    init_db()
+
     app = FastAPI(
         title="Snake Duel API",
         description="OpenAPI specification for Snake Duel multiplayer game",
