@@ -24,5 +24,5 @@ serve:
 	$(PY) -m uvicorn main:app --reload --host 0.0.0.0 --port 4000
 
 test:
-	@echo "Running tests"
-	$(PY) -m pytest -q
+	@echo "Running tests with SQLite in-memory database"
+	DATABASE_URL="sqlite:///:memory:" $(PY) -m pytest -q
