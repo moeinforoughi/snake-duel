@@ -1,3 +1,5 @@
+<center>Fully AI generated project from zero to CI/CD</center>
+
 # Snake Duel
 
 ## Quick Start (Run Both Frontend & Backend)
