@@ -29,12 +29,12 @@ jobs:
       - name: Install backend dependencies
         working-directory: ./backend
         run: |
-          ~/.cargo/bin/uv sync --no-dev
+          uv sync --no-dev
 
       - name: Run backend tests
         working-directory: ./backend
         run: |
-          ~/.cargo/bin/uv run pytest
+          uv run pytest
 
       # ---------- Frontend Build / Tests ----------
       - name: Set up Node ${{ matrix.node-version }}
@@ -63,18 +63,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install uv (Python package manager)
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install uv (Python package manager) via pip
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install backend dependencies
         working-directory: ./backend
         run: |
-          ~/.cargo/bin/uv sync --no-dev
+          uv sync --no-dev
 
       - name: Run backend integration tests
         working-directory: ./backend
         run: |
-          ~/.cargo/bin/uv run pytest -k integration
+          uv run pytest -k integration
   deploy:
     needs: [test, integration]
     runs-on: ubuntu-latest
