@@ -26,10 +26,10 @@ jobs:
       - name: Install uv (Python package manager)
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Install backend dependencies
+      - name: Install backend dependencies (including dev)
         working-directory: ./backend
         run: |
-          uv sync --no-dev
+          uv sync
 
       - name: Run backend tests
         working-directory: ./backend
