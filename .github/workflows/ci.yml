@@ -1,0 +1,93 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.12]
+        node-version: [20]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------- Backend Tests ----------
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv (Python package manager)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          ~/.cargo/bin/uv sync --no-dev
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          ~/.cargo/bin/uv run pytest
+
+      # ---------- Frontend Build / Tests ----------
+      - name: Set up Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend (ensures no compile errors)
+        working-directory: ./frontend
+        run: npm run build
+
+  integration:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv (Python package manager)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          ~/.cargo/bin/uv sync --no-dev
+
+      - name: Run backend integration tests
+        working-directory: ./backend
+        run: |
+          ~/.cargo/bin/uv run pytest -k integration
+  deploy:
+    needs: [test, integration]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && success()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          # Render automatically deploys on push to the main branch when a render.yaml is present.
+          # If you need to trigger a manual deploy, you can use the Render CLI:
+          # npm i -g @render-cli/cli && render deploy
+          echo "Render deployment triggered by push to main."
