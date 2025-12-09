@@ -1,14 +1,11 @@
 # Point of creation
 
 **Fully AI generated project from zero to automatic deployment**
-
-	* Frontend(UI) was made by Lovable AI
-	
-	* Backend and integrations are done by Claude AI, Copilot and Gemeni 3
-	
-	* The IDE was used for creation was AntiGravity
-	* CI/CD pipeline and deplyment stuff have done by GPT-OSS and Claude
-	* Deployed on Render PaaS service and it was fully functional
+	- *Frontend(UI) was made by Lovable AI*
+	- *Backend and integrations are done by Claude AI, Copilot and Gemeni 3*
+	- *The IDE was used for creation was AntiGravity*
+	- *CI/CD pipeline and deplyment stuff have done by GPT-OSS and Claude*
+	- *Deployed on Render PaaS service and it was fully functional*
 
 # Snake Duel
 
