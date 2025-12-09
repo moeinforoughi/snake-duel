@@ -29,12 +29,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include routers under /api prefix
-    app.include_router(auth_router, prefix="/api")
-    app.include_router(leaderboard_router, prefix="/api")
-    app.include_router(players_router, prefix="/api")
+    # Include routers
+    app.include_router(auth_router)
+    app.include_router(leaderboard_router)
+    app.include_router(players_router)
 
-    @app.get("/api")
+    @app.get("/")
     def root():
         """Root endpoint"""
         return {"message": "Snake Duel API", "version": "0.1.0"}
