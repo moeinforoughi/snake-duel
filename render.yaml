@@ -1,0 +1,20 @@
+services:
+  - type: postgres
+    name: snake-duel-db
+    plan: free
+    envVars:
+      POSTGRES_DB: snake_duel
+      POSTGRES_USER: snakeuser
+      POSTGRES_PASSWORD: snakepass
+    # Render will automatically set DATABASE_URL for dependent services
+
+  - type: web
+    name: snake-duel-backend
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port 8000"
+    envVars:
+      DATABASE_URL: ${DATABASE_URL}  # injected from the Postgres service above
+    healthCheckPath: "/health"
+    ports:
+      - 8000
